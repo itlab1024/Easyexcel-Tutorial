@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<configuration  xmlns="http://ch.qos.logback/xml/ns/logback"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://ch.qos.logback/xml/ns/logback
+                https://raw.githubusercontent.com/enricopulatzo/logback-XSD/master/src/main/xsd/logback.xsd">
+
+    <!-- ch.qos.logback.core.ConsoleAppender 控制台输出 -->
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>[%-5level] %d{HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 日志级别 -->
+    <root level="off">
+<!--        <appender-ref ref="console" />-->
+    </root>
+    <logger name="com.itlab1024.easyexcel" level="debug">
+        <appender-ref ref="console"/>
+    </logger>
+</configuration>
