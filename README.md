@@ -996,7 +996,384 @@ public void writeCellDataWrite() {
 }
 ```
 
-### 根据模板写入
+### 注解的使用
 
-首先需要有一个模板
+**列宽、行高**
 
+行高主要有表头的行高和内容的行高，分别是如下两个注解，是能使用在类上。
+
+```java
+@ContentRowHeight(10)
+@HeadRowHeight(20)
+```
+
+列宽使用如下注解
+
+```java
+@ColumnWidth(50)
+```
+
+**字体风格**
+
+```java
+@ContentFontStyle
+```
+
+**表头样式（对齐等等）**
+
+```
+@HeadStyle
+```
+
+
+
+**合并单元格**
+
+
+
+```java
+// 这一列 每隔2行 合并单元格
+@ContentLoopMerge(eachRow = 2)
+
+
+// 将第6-7行的2-3列合并成一个单元格
+@OnceAbsoluteMerge(firstRowIndex = 5, lastRowIndex = 6, firstColumnIndex = 1, lastColumnIndex = 2)
+```
+
+示例代码：
+
+```java
+package com.itlab1024.easyexcel.write;
+
+import com.alibaba.excel.annotation.ExcelProperty;
+import com.alibaba.excel.annotation.write.style.*;
+import com.alibaba.excel.enums.BooleanEnum;
+import com.alibaba.excel.enums.poi.HorizontalAlignmentEnum;
+import com.alibaba.excel.enums.poi.VerticalAlignmentEnum;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.apache.poi.ss.usermodel.Font;
+
+import java.util.Date;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@HeadRowHeight(30) // 表头行高
+@ContentRowHeight(50) // 内容行高
+@ColumnWidth(30) // 列宽
+@ContentFontStyle(fontName = "monaco", bold = BooleanEnum.TRUE, color = Font.COLOR_RED, underline = Font.U_DOUBLE) // 内容文字风格
+@HeadFontStyle(fontName = "Arial", bold = BooleanEnum.TRUE, color = Font.COLOR_RED, underline = Font.U_SINGLE_ACCOUNTING) // 表头文字风格
+@HeadStyle(horizontalAlignment = HorizontalAlignmentEnum.LEFT, verticalAlignment = VerticalAlignmentEnum.CENTER) //表头风格
+@OnceAbsoluteMerge(firstRowIndex = 5, lastRowIndex = 6, firstColumnIndex = 1, lastColumnIndex = 2)
+public class WriteSampleDataAnnotation {
+    @ExcelProperty("姓名")
+    @ContentLoopMerge(eachRow = 2)
+    private String name;
+    @ExcelProperty("年龄")
+    private int age;
+    @ExcelProperty("出生年月")
+    @ColumnWidth(50) // 单独设置 birthday列宽
+    private Date birthday;
+}
+```
+
+
+
+运行结果：
+
+![image-20220803122051934](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031220078.png)
+
+
+
+### 使用Table写入
+
+主要使用writerTable()方法
+
+```java
+@Test
+public void testTableWrite() {
+  WriteTable writeTable = EasyExcel.writerTable()
+    .needHead(Boolean.TRUE) // 是否需要表头
+    .tableNo(0) // 表索引
+    .build();
+  ExcelWriter excelWriter = EasyExcel.write("write.xlsx").build();
+  WriteSheet writeSheet = EasyExcel.writerSheet("Table写入").build();
+  excelWriter.write(sampleData, writeSheet, writeTable);
+  excelWriter.close();
+}
+```
+
+
+
+![image-20220803122735404](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031227588.png)
+
+
+
+### 动态表头
+
+动态表头主要是通过.head()方法设置，传递一个List<List<String>>类型的参数。
+
+```java
+@Test
+public void testDynamicHeadWrite() {
+  EasyExcel.write("write.xlsx")
+    .head(makeHead()).sheet("动态表头")
+    .doWrite(sampleData);
+}
+
+private List<List<String>> makeHead() {
+  List<List<String>> lists = new ArrayList<>();
+  List<String> list = Lists.newArrayList();
+  list.add("合并表头");
+  list.add("姓名");
+  List<String> list2 = Lists.newArrayList();
+  list2.add("合并表头");
+  list2.add("年龄");
+  List<String> list3 = Lists.newArrayList();
+  list3.add("出生年月");
+  lists.add(list);
+  lists.add(list2);
+  lists.add(list3);
+  return lists;
+}
+```
+
+运行结果：
+
+![image-20220803123333485](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031233667.png)
+
+### 自动列宽
+
+自动列宽是源码内置的一个handler处理器，使用方法如下。
+
+```java
+@Test
+public void  testAutoCellWidthWrite() {
+  EasyExcel.write("write.xlsx", WriteSampleData.class)
+    .registerWriteHandler(new LongestMatchColumnWidthStyleStrategy()).sheet("模板").doWrite(sampleData);
+}
+```
+
+运行结果：
+
+不设置自动列宽
+
+![image-20220803123950568](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031239659.png)
+
+设置自动列宽后
+
+![image-20220803123847610](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031238748.png)
+
+
+
+### 自定义拦截器
+
+以上方式都不能满足需求的情况下，可以自定义拦截器实现。
+
+官网demo代码如下:
+
+```java
+/**
+ * 自定义拦截器。对第一行第一列的头超链接到:https://github.com/alibaba/easyexcel
+ *
+ * @author Jiaju Zhuang
+ */
+@Slf4j
+public class CustomCellWriteHandler implements CellWriteHandler {
+
+    @Override
+    public void afterCellDispose(CellWriteHandlerContext context) {
+        Cell cell = context.getCell();
+        // 这里可以对cell进行任何操作
+        log.info("第{}行，第{}列写入完成。", cell.getRowIndex(), cell.getColumnIndex());
+        if (BooleanUtils.isTrue(context.getHead()) && cell.getColumnIndex() == 0) {
+            CreationHelper createHelper = context.getWriteSheetHolder().getSheet().getWorkbook().getCreationHelper();
+            Hyperlink hyperlink = createHelper.createHyperlink(HyperlinkType.URL);
+            hyperlink.setAddress("https://github.com/alibaba/easyexcel");
+            cell.setHyperlink(hyperlink);
+        }
+    }
+
+}
+
+
+/**
+ * 自定义拦截器.对第一列第一行和第二行的数据新增下拉框，显示 测试1 测试2
+ *
+ * @author Jiaju Zhuang
+ */
+@Slf4j
+public class CustomSheetWriteHandler implements SheetWriteHandler {
+
+    @Override
+    public void afterSheetCreate(SheetWriteHandlerContext context) {
+        log.info("第{}个Sheet写入成功。", context.getWriteSheetHolder().getSheetNo());
+
+        // 区间设置 第一列第一行和第二行的数据。由于第一行是头，所以第一、二行的数据实际上是第二三行
+        CellRangeAddressList cellRangeAddressList = new CellRangeAddressList(1, 2, 0, 0);
+        DataValidationHelper helper = context.getWriteSheetHolder().getSheet().getDataValidationHelper();
+        DataValidationConstraint constraint = helper.createExplicitListConstraint(new String[] {"测试1", "测试2"});
+        DataValidation dataValidation = helper.createValidation(constraint, cellRangeAddressList);
+        context.getWriteSheetHolder().getSheet().addValidationData(dataValidation);
+    }
+}
+
+
+ /**
+     * 下拉，超链接等自定义拦截器（上面几点都不符合但是要对单元格进行操作的参照这个）
+     * <p>
+     * demo这里实现2点。1. 对第一行第一列的头超链接到:https://github.com/alibaba/easyexcel 2. 对第一列第一行和第二行的数据新增下拉框，显示 测试1 测试2
+     * <p>
+     * 1. 创建excel对应的实体对象 参照{@link DemoData}
+     * <p>
+     * 2. 注册拦截器 {@link CustomCellWriteHandler} {@link CustomSheetWriteHandler}
+     * <p>
+     * 2. 直接写即可
+     */
+    @Test
+    public void customHandlerWrite() {
+        String fileName = TestFileUtil.getPath() + "customHandlerWrite" + System.currentTimeMillis() + ".xlsx";
+        // 这里 需要指定写用哪个class去写，然后写到第一个sheet，名字为模板 然后文件流会自动关闭
+        EasyExcel.write(fileName, DemoData.class).registerWriteHandler(new CustomSheetWriteHandler())
+            .registerWriteHandler(new CustomCellWriteHandler()).sheet("模板").doWrite(data());
+    }
+
+```
+
+## 填充Excel
+
+填充Excel主要是通过在excel中使用{}定义需要替换掉问题，比如{name}就对应类中的name属性。
+
+预置一个模板文件。
+
+![image-20220803125456665](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031254786.png)
+
+
+
+### 基本写入
+
+模板写入，
+
+> 特别注意：数据类无需使用@ExcelProperty等注解（因为文件已经有了，就是替换嘛）,加上反而有问题，我遇到的问题是程序没有出错，但是数据未成功写入。
+
+代码如下
+
+```
+package com.itlab1024.easyexcel.write;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class WriteTemplateSampleData {
+    private String name;
+    private int age;
+    private Date birthday;
+}
+
+```
+
+写入代码
+
+```java
+@Test
+public void testTemplateBasicWrite() {
+  WriteTemplateSampleData writeTemplateSampleData = new WriteTemplateSampleData();
+  writeTemplateSampleData.setName("张三");
+  writeTemplateSampleData.setAge(5);
+  writeTemplateSampleData.setBirthday(new Date());
+  EasyExcel.write("write.xlsx").withTemplate("template.xlsx").sheet().doFill(writeTemplateSampleData);
+}
+```
+
+运行结果：
+
+![image-20220803125629544](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031256690.png)
+
+
+
+### 填充列表
+
+上面的李四是一条数据，如果是多条数据如何填充呢？这就得修改模板使用{.属性名}来实现。
+
+![image-20220803125943146](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031259288.png)
+
+代码如下
+
+```java
+@Test
+public void testTemplateListWrite() {
+  WriteTemplateSampleData writeTemplateSampleData = new WriteTemplateSampleData();
+  writeTemplateSampleData.setName("张三");
+  writeTemplateSampleData.setAge(5);
+  writeTemplateSampleData.setBirthday(new Date());
+  WriteTemplateSampleData writeTemplateSampleData2 = new WriteTemplateSampleData();
+  writeTemplateSampleData2.setName("张三2");
+  writeTemplateSampleData2.setAge(5);
+  writeTemplateSampleData2.setBirthday(new Date());
+  List<WriteTemplateSampleData> datas = new ArrayList<>();
+  datas.add(writeTemplateSampleData2);
+  datas.add(writeTemplateSampleData);
+  EasyExcel.write("write.xlsx").withTemplate("templateList.xlsx").sheet().doFill(datas);
+  //
+  // 方案2 分多次 填充 会使用文件缓存（省内存） jdk8
+  // since: 3.0.0-beta1
+  //        EasyExcel.write("write.xlsx").withTemplate("templateList.xlsx").sheet()
+  //                .doFill(() -> {
+  //                    // 分页查询数据
+  //                    return null;
+  //                });
+
+  // 方案3 分多次 填充 会使用文件缓存（省内存）
+  //        try (ExcelWriter excelWriter = EasyExcel.write("write.xlsx").withTemplate("templateList.xlsx").build()) {
+  //            WriteSheet writeSheet = EasyExcel.writerSheet().build();
+  //            excelWriter.fill(分片数据, writeSheet);
+  //            excelWriter.fill(分片数据, writeSheet);
+  //        }
+}
+```
+
+
+
+执行结果：
+
+![image-20220803130515309](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031305476.png)
+
+# 复杂填充
+
+当excel表比较复杂，比如数据分很多类的时候，可以将数据使用Map这种数据类型包装起来。代码与上面类似。
+
+### 横向填充
+
+有时候可能是一个合并的单元格，第一列是统计，后面有好几列，分别是子统计，比如如下图
+
+![下载](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202208031317499.png)
+
+就可以使用FillConfig的direction(WriteDirectionEnum.HORIZONTAL)方法配置
+
+示例如下代码
+
+```java
+ // 方案1
+try (ExcelWriter excelWriter = EasyExcel.write(fileName).withTemplate(templateFileName).build()) {
+  WriteSheet writeSheet = EasyExcel.writerSheet().build();
+  FillConfig fillConfig = FillConfig.builder().direction(WriteDirectionEnum.HORIZONTAL).build();
+  excelWriter.fill(data(), fillConfig, writeSheet);
+  excelWriter.fill(data(), fillConfig, writeSheet);
+
+  Map<String, Object> map = new HashMap<>();
+  map.put("date", "2019年10月9日13:28:28");
+  excelWriter.fill(map, writeSheet);
+}
+```
+
+> 总结: Easyexcel还是一个非常不错的工具，内存确实得到了优化，对于大数据Excel的导入导出很棒！
+>
+> 后面有点偷懒了，并没有一一尝试。

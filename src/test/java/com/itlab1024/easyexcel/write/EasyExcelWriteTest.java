@@ -7,6 +7,10 @@ import com.alibaba.excel.metadata.data.ImageData;
 import com.alibaba.excel.metadata.data.WriteCellData;
 import com.alibaba.excel.util.FileUtils;
 import com.alibaba.excel.write.metadata.WriteSheet;
+import com.alibaba.excel.write.metadata.WriteTable;
+import com.alibaba.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
+import com.itlab1024.easyexcel.read.SampleData;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.poi.util.IOUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -112,6 +116,105 @@ public class EasyExcelWriteTest {
         imageData.setLeft(5);
         cellData.setImageDataList(imageDataList);
         imageSampleData.setWriteCellDataFile(cellData);
-        EasyExcel.write("write.xlsx", WriteImageSampleData.class).sheet().doWrite(Collections.singleton(imageSampleData));
+        EasyExcel.write("write.xlsx", WriteSampleData.class).sheet().doWrite(Collections.singleton(imageSampleData));
+    }
+
+    /**
+     * 注解
+     */
+    @Test
+    public void testAnnotationWrite() {
+        EasyExcel.write("write.xlsx").sheet("基本写入").head(WriteSampleDataAnnotation.class).doWrite(sampleData);
+    }
+
+    /**
+     * 表格方式写入
+     */
+    @Test
+    public void testTableWrite() {
+        WriteTable writeTable = EasyExcel.writerTable()
+                .needHead(Boolean.TRUE) // 是否需要表头
+                .tableNo(0) // 表索引
+                .build();
+        ExcelWriter excelWriter = EasyExcel.write("write.xlsx").build();
+        WriteSheet writeSheet = EasyExcel.writerSheet("Table写入").build();
+        excelWriter.write(sampleData, writeSheet, writeTable);
+        excelWriter.close();
+    }
+
+    /**
+     * 动态表头
+     */
+    @Test
+    public void testDynamicHeadWrite() {
+        EasyExcel.write("write.xlsx")
+                .head(makeHead()).sheet("动态表头")
+                .doWrite(sampleData);
+    }
+
+    private List<List<String>> makeHead() {
+        List<List<String>> lists = new ArrayList<>();
+        List<String> list = Lists.newArrayList();
+        list.add("合并表头");
+        list.add("姓名");
+        List<String> list2 = Lists.newArrayList();
+        list2.add("合并表头");
+        list2.add("年龄");
+        List<String> list3 = Lists.newArrayList();
+        list3.add("出生年月");
+        lists.add(list);
+        lists.add(list2);
+        lists.add(list3);
+        return lists;
+    }
+
+    @Test
+    public void  testAutoCellWidthWrite() {
+        sampleData.add(new WriteSampleData("定义数组\n" +
+                "go中数组的定义方式如下。\n" +
+                "\n" +
+                "var 变量名 [长度]数组存储的类型\n" +
+                "初始化数组\n" +
+                "数组如果没有初始化，那么就是零值（比如int的零值是0，string的零值就是\"\"）。", 1, new Date()));
+        EasyExcel.write("write.xlsx", WriteSampleData.class).sheet("模板").doWrite(sampleData);
+    }
+    @Test
+    public void testTemplateBasicWrite() {
+        WriteTemplateSampleData writeTemplateSampleData = new WriteTemplateSampleData();
+        writeTemplateSampleData.setName("张三");
+        writeTemplateSampleData.setAge(5);
+        writeTemplateSampleData.setBirthday(new Date());
+        EasyExcel.write("write.xlsx").withTemplate("template.xlsx").sheet().doFill(writeTemplateSampleData);
+    }
+
+    @Test
+    public void testTemplateListWrite() {
+        WriteTemplateSampleData writeTemplateSampleData = new WriteTemplateSampleData();
+        writeTemplateSampleData.setName("张三");
+        writeTemplateSampleData.setAge(5);
+        writeTemplateSampleData.setBirthday(new Date());
+        WriteTemplateSampleData writeTemplateSampleData2 = new WriteTemplateSampleData();
+        writeTemplateSampleData2.setName("张三2");
+        writeTemplateSampleData2.setAge(5);
+        writeTemplateSampleData2.setBirthday(new Date());
+        List<WriteTemplateSampleData> datas = new ArrayList<>();
+        datas.add(writeTemplateSampleData2);
+        datas.add(writeTemplateSampleData);
+        EasyExcel.write("write.xlsx").withTemplate("templateList.xlsx").sheet().doFill(datas);
+        //
+        // 方案2 分多次 填充 会使用文件缓存（省内存） jdk8
+        // since: 3.0.0-beta1
+//        EasyExcel.write("write.xlsx").withTemplate("templateList.xlsx").sheet()
+//                .doFill(() -> {
+//                    // 分页查询数据
+//                    return null;
+//                });
+
+        // 方案3 分多次 填充 会使用文件缓存（省内存）
+//        try (ExcelWriter excelWriter = EasyExcel.write("write.xlsx").withTemplate("templateList.xlsx").build()) {
+//            WriteSheet writeSheet = EasyExcel.writerSheet().build();
+//            excelWriter.fill(分片数据, writeSheet);
+//            excelWriter.fill(分片数据, writeSheet);
+//        }
     }
 }
